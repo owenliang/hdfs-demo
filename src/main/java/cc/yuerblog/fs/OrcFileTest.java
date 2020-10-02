@@ -1,0 +1,64 @@
+package cc.yuerblog.fs;
+
+
+import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.hive.ql.exec.vector.BytesColumnVector;
+import org.apache.hadoop.hive.ql.exec.vector.LongColumnVector;
+import org.apache.hadoop.hive.ql.exec.vector.VectorizedRowBatch;
+import org.apache.orc.*;
+
+import java.io.IOException;
+
+// ORC格式介绍：https://www.wangt.cc/2019/10/%E9%98%85%E8%AF%BBhive-orc-%E6%96%87%E4%BB%B6-%E5%AE%98%E6%96%B9%E6%96%87%E6%A1%A3/
+public class OrcFileTest {
+    public void run(Configuration conf) throws IOException {
+        // 数据结构描述
+        TypeDescription schema = TypeDescription.createStruct();
+        schema.addField("id", TypeDescription.createInt());
+        schema.addField("name", TypeDescription.createString());
+
+        // 文件路径
+        Path path = new Path("/orc.txt");
+
+        // 写打开
+        Writer out = OrcFile.createWriter(path, OrcFile.writerOptions(conf).
+                        setSchema(schema).compress(CompressionKind.SNAPPY).overwrite(true));
+
+        // 写入1000行
+        VectorizedRowBatch rowBatch = schema.createRowBatch();  // 每个batch内的N行按列存储
+        LongColumnVector idColumn = (LongColumnVector)rowBatch.cols[0]; // id 列
+        BytesColumnVector nameColumn = (BytesColumnVector)rowBatch.cols[1]; // name列
+        for (int i = 0; i < 1000; i++) {
+            idColumn.vector[i] = i ;
+            nameColumn.vector[i] = String.format("name-%d", i).getBytes();
+            if (++rowBatch.size == rowBatch.getMaxSize()) {
+                out.addRowBatch(rowBatch);
+                rowBatch.reset();
+            }
+        }
+        if (rowBatch.size != 0) {
+            out.addRowBatch(rowBatch);
+            rowBatch.reset();
+        }
+        out.close();
+
+        /////////
+
+        // 读打开
+        Reader in = OrcFile.createReader(path, OrcFile.readerOptions(conf));
+        // 解析schema
+        VectorizedRowBatch inBatch = in.getSchema().createRowBatch();
+        // 流解析文件
+        RecordReader rows = in.rows();
+        while (rows.nextBatch(inBatch)) {   // 读1个batch
+            // 列式读取
+            LongColumnVector idCol = (LongColumnVector)rowBatch.cols[0]; // id 列
+            BytesColumnVector nameCol = (BytesColumnVector)rowBatch.cols[1]; // name列
+            for (int i = 0; i < inBatch.size; i++) {
+                System.out.printf("[Orc] id=%d name=%s\n", idCol.vector[i], new String(nameCol.vector[i]));
+            }
+        }
+        rows.close();
+    }
+}
