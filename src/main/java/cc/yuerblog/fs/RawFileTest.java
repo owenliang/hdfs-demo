@@ -19,7 +19,7 @@ public class RawFileTest {
         FileSystem dfs = FileSystem.get(conf);
 
         // 文件路径
-        Path path = new Path("/raw.txt");
+        Path path = new Path("/raw.gz");
 
         // GZIP编码器
         CompressionCodec codec = new CompressionCodecFactory(conf).getCodecByName("gzip");
