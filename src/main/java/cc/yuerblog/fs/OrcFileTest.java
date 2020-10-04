@@ -4,6 +4,7 @@ package cc.yuerblog.fs;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hive.ql.exec.vector.BytesColumnVector;
+import org.apache.hadoop.hive.ql.exec.vector.ColumnVector;
 import org.apache.hadoop.hive.ql.exec.vector.LongColumnVector;
 import org.apache.hadoop.hive.ql.exec.vector.VectorizedRowBatch;
 import org.apache.orc.*;
@@ -30,8 +31,9 @@ public class OrcFileTest {
         LongColumnVector idColumn = (LongColumnVector)rowBatch.cols[0]; // id 列
         BytesColumnVector nameColumn = (BytesColumnVector)rowBatch.cols[1]; // name列
         for (int i = 0; i < 1000; i++) {
-            idColumn.vector[i] = i ;
-            nameColumn.vector[i] = String.format("name-%d", i).getBytes();
+            idColumn.vector[rowBatch.size] = i;
+            String name = String.format("name-%d", i);
+            nameColumn.setVal(rowBatch.size, name.getBytes());
             if (++rowBatch.size == rowBatch.getMaxSize()) {
                 out.addRowBatch(rowBatch);
                 rowBatch.reset();
@@ -53,10 +55,10 @@ public class OrcFileTest {
         RecordReader rows = in.rows();
         while (rows.nextBatch(inBatch)) {   // 读1个batch
             // 列式读取
-            LongColumnVector idCol = (LongColumnVector)rowBatch.cols[0]; // id 列
-            BytesColumnVector nameCol = (BytesColumnVector)rowBatch.cols[1]; // name列
+            LongColumnVector idCol = (LongColumnVector)inBatch.cols[0]; // id 列
+            BytesColumnVector nameCol = (BytesColumnVector)inBatch.cols[1]; // name列
             for (int i = 0; i < inBatch.size; i++) {
-                System.out.printf("[Orc] id=%d name=%s\n", idCol.vector[i], new String(nameCol.vector[i]));
+                System.out.printf("[Orc] id=%d name=%s\n", idCol.vector[i], new String(nameCol.vector[i], nameCol.start[i], nameCol.length[i]));
             }
         }
         rows.close();
