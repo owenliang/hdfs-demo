@@ -58,6 +58,7 @@ public class OrcFileTest {
             LongColumnVector idCol = (LongColumnVector)inBatch.cols[0]; // id 列
             BytesColumnVector nameCol = (BytesColumnVector)inBatch.cols[1]; // name列
             for (int i = 0; i < inBatch.size; i++) {
+                // 注意：因为是列存储，所以name列是一个大buffer存储的，需要从里面的start偏移量取length长度的才是该行的列值
                 System.out.printf("[Orc] id=%d name=%s\n", idCol.vector[i], new String(nameCol.vector[i], nameCol.start[i], nameCol.length[i]));
             }
         }
